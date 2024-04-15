@@ -33,7 +33,7 @@ public class Main {
                 threadPool.execute(worker);
             }
         }
-        threadPool.shutdown();
+        threadPool.shutdownNow();
         Controller.logger.log("http server stopped");
     }
 }
