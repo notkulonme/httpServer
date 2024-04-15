@@ -3,6 +3,6 @@ ha van # a sorba az automatikusan commnet lesz tehát óvatosan a #-el ja tudom 
 "port" = "1027";
 "webroot" = "/home/notkulonme/prgraming/web stuff/webserver";
 "loggerpath" = "/home/notkulonme/prgraming/web stuff/webserver/logg.txt";
-"404" = "true";
-"maxThread" = "10";
+"404" = "false";
+"maxThread" = "100";
 "timeOut" = "5";

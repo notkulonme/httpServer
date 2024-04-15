@@ -1,0 +1,8 @@
+#amúgy lehet spacet is tenni a nevekbe
+ha van # a sorba az automatikusan commnet lesz tehát óvatosan a #-el ja tudom ez egy szar design pattern de ez van ezt kell szeretni
+"port" = "1027";
+"webroot" = "/webserver";
+"loggerpath" = "/webserver/logg.txt";
+"404" = "true";
+"maxThread" = "10";
+"timeOut" = "5";

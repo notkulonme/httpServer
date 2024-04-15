@@ -5,7 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 
 public class Worker implements Runnable {
-
+    //very important variables
     private final Socket socket;
     private final String CRLF = "\r\n";
 
@@ -15,13 +15,14 @@ public class Worker implements Runnable {
 
 
     public Worker(Socket socket) {
+        Controller.logger.log(socket.getInetAddress() + " connected");
         this.socket = socket;
         InputStream bufferin;
         OutputStream bufferout;
         try {
             bufferin = socket.getInputStream();
             bufferout = socket.getOutputStream();
-        }catch (IOException e) {
+        } catch (IOException e) {
             bufferin = null;
             bufferout = null;
         }
@@ -29,76 +30,97 @@ public class Worker implements Runnable {
         reader = new BufferedReader(new InputStreamReader(bufferin));
     }
 
+    /***
+     * The method is started by the Thread pool
+     * Starts the whole data processing
+     */
     public void run() {
 
-        Controller.logger.log(socket.getInetAddress() + " connected");
-        String request;
+       if (writer != null && reader !=null){
+           try {
+               process();
+           } catch (IOException e) {
+            Controller.logger.log("Error while writing to the output stream of "+socket.getInetAddress()+", the connection is closed");
+        }
+       }
+        close();
+    }
 
-        try {
+    /**
+     *processes the request
+     * @throws IOException only if the output stream is unwriteable
+     */
+    public void process() throws IOException {
 
-            request = readRequest();
-            RequestParser parser = new RequestParser(request);
+        String request = readRequest();
 
-            ResponseBuilder response;
+
+        RequestParser parser = new RequestParser(request);
+
+        ResponseBuilder response = null;
+
             if (!parser.error) {
                 Controller.logger.log(parser.requestType + " " + parser.requestedFile);
                 if (parser.requestType.equalsIgnoreCase("get")) {
-                    File f = new File(Controller.WEBROOT + parser.requestedFile);
 
-                    response = GEThandler(f, parser);
+                    parser.requestedFile = Controller.WEBROOT + parser.requestedFile;
+                    response = GEThandler(parser);
 
-                    writer.write(response.getResponse());
                 } else if (parser.requestType.equalsIgnoreCase("post")) {
 
                     response = POSThandler(parser);
-
+                }
+                if (response != null) {
                     writer.write(response.getResponse());
                 }
             } else {
-                //in case of an error
+                //Handles the error
                 writer.write(("HTTP/1.1 " + parser.errorType + CRLF + "Connection: close" + CRLF + CRLF).getBytes());
             }
             writer.flush();
 
-
-        } catch (IOException e) {
-
-            //this probably need more error handling but i don't wanna do it :c
-            Controller.logger.log("Error while handling the request");
-        }
-        try {
-            close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
-
-
-    private ResponseBuilder POSThandler(RequestParser parser) throws IOException {
+    /**
+     * IN TEST PHASE!!!
+     *Handles the POST request
+     */
+    private ResponseBuilder POSThandler(RequestParser parser) {
         ResponseBuilder response = new ResponseBuilder();
         response.addToHeader("HTTP/1.1 200 ok");
-        ResponseBuilder file = GEThandler(new RequestParser(Controller.WEBROOT+"/index.html","html"));
+        ResponseBuilder file = GEThandler(new RequestParser(Controller.WEBROOT + "/index.html", "html"));
         response.addToHeader(file.getByteHeader());
         response.addToBody(file.getByteBody());
         return response;
     }
 
 
-
-
-    private ResponseBuilder GEThandler(File f, RequestParser parser) throws IOException {
+    /**
+     * Handles the GET requests according to the HTTP standard
+     * reads the file into the ram stores it in a ResponseBuilder
+     *
+     * @return a ResponseBuilder stroring the header and the body of the Response in a byte array form
+     */
+    private ResponseBuilder GEThandler(RequestParser parser) {
+        File f = new File(parser.requestedFile);
         ContentType ct = new ContentType();
         ResponseBuilder response = new ResponseBuilder();
         if ((f.exists() || parser.requestedFile.equals("/")) && !f.isDirectory()) {
-            byte[] content = Files.readAllBytes(f.toPath());
+            byte[] content;
+            try {
+                content = Files.readAllBytes(f.toPath());
+            } catch (IOException e) {
+                Controller.logger.log("Error while reading from the " + f.getName() + " file");
+                content = new byte[0];
+            }
+
             if (ct.isText(parser.fileType)) {
 
                 response.addToHeader("HTTP/1.1 200 ok");
                 response.addToHeader("Content-Type: text/" + parser.fileType + "; charset=utf-8");
                 response.addToHeader("Content-Length: " + content.length);
                 response.addToHeader("Connection: close");
-                response.addToBody(f);
+                response.addToBody(content);
 
 
             } else {
@@ -106,19 +128,25 @@ public class Worker implements Runnable {
                 response.addToHeader("HTTP/1.1 200 ok");
                 response.addToHeader("Content-Type: image/" + parser.fileType);
                 response.addToHeader("Connection: close");
-                response.addToBody(f);
+                response.addToBody(content);
 
             }
 
         } else {
             if ((parser.fileType.equals("null") || ct.isText(parser.fileType)) && Controller.conf.getBool("404")) {
                 f = new File(Controller.WEBROOT + "/404/404.html");
-                byte[] content = Files.readAllBytes(f.toPath());
+                byte[] content;
+                try {
+                    content = Files.readAllBytes(f.toPath());
+                } catch (IOException e) {
+                    Controller.logger.log("Error while reading from the " + f.getName() + " file");
+                    content = new byte[0];
+                }
                 response.addToHeader("HTTP/1.1 404 Not Found");
                 response.addToHeader("Content-Type: text/html");
                 response.addToHeader("Content-Length: " + content.length);
                 response.addToHeader("Connection: close");
-                response.addToBody(f);
+                response.addToBody(content);
             } else {
                 response.addToHeader("HTTP/1.1 404 Not Found");
                 response.addToHeader("Connection: close");
@@ -128,46 +156,39 @@ public class Worker implements Runnable {
         return response;
     }
 
-    private ResponseBuilder GEThandler(RequestParser parser) throws IOException {
-        File f = new File(parser.requestedFile);
-        ResponseBuilder response = new ResponseBuilder();
-        ContentType ct = new ContentType();
-        if (f.exists() && !f.isDirectory()) {
-            byte[] content = Files.readAllBytes(f.toPath());
-            if (ct.isText(parser.fileType)) {
-                response.addToHeader("Content-Type: text/" + parser.fileType + "; charset=utf-8");
-                response.addToHeader("Content-Length: " + content.length);
-                response.addToHeader("Connection: close");
-                response.addToBody(f);
-
-
-            } else {
-                response.addToHeader("Content-Type: image/" + parser.fileType);
-                response.addToHeader("Connection: close");
-                response.addToBody(f);
-            }
-        }
-        return response;
-    }
-
-
-        private String readRequest () throws IOException {
-            final StringBuilder request = new StringBuilder();
-            Instant start = Instant.now();
+    /**
+     * reads the request from the InputStream
+     *
+     * @return the readed request
+     * @return error and type of the error based on the HTTP standard
+     */
+    private String readRequest() {
+        final StringBuilder request = new StringBuilder();
+        Instant start = Instant.now();
+        int timeOut = Controller.conf.getInt("timeOut");
+        try {
             while (!reader.ready()) {
                 Instant end = Instant.now();
                 Duration duration = Duration.between(start, end);
-                if (duration.toSeconds() >= Controller.conf.getInt("timeOut")) {
+                if (duration.toSeconds() >= timeOut) {
                     return "error 408 \r\n";
                 }
             }
             while (reader.ready()) {
                 request.append((char) reader.read());
             }
-            return request.toString();
+        } catch (IOException e) {
+            Controller.logger.log("Error while reading from " + socket.getInetAddress() + "'s input stream");
+            return "error 500 \r\n";
         }
+        return request.toString();
+    }
 
-        private void close () throws IOException {
+    /**
+     *Closes all resources and the socket
+     */
+    private void close() {
+        try {
             if (reader != null && writer != null) {
                 reader.close();
                 writer.close();
@@ -176,5 +197,8 @@ public class Worker implements Runnable {
 
             Controller.logger.log(socket.getInetAddress() + " connection closed");
             socket.close();
+        } catch (IOException e) {
+            Controller.logger.log("Resources can't be released");
         }
     }
+}

@@ -1,0 +1,7 @@
+"port" = "1030";
+"webroot" = "C:/Users/nrics/Desktop/webserver";
+"loggerpath" = "C:/Users/nrics/Desktop/webserver/logg.txt";
+"404" = "true";
+"run" = "false";
+"maxThread" = "100";
+"timeOut" = "5";

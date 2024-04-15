@@ -17,7 +17,7 @@ public class Controller {
     public static String WEBROOT = null;
     public static volatile boolean run = true;
     public static int maxThread = -1;
-    public static Logger logger = null;
+    public static volatile Logger logger = null;
     public String startMessage = "The server is started";
 
     public Controller(String confPath) {
@@ -32,8 +32,6 @@ public class Controller {
             run = false;
         }
         this.server = server;
-        Thread uc = new Thread(this::userController);
-        uc.start();
     }
 
     private void load() {
@@ -45,7 +43,7 @@ public class Controller {
     }
 
 
-    private void userController() {
+    public void userController() {
         ServerSocket ssc = null;
         try {
             ssc = new ServerSocket(28852);

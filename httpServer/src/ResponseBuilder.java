@@ -36,10 +36,15 @@ public class ResponseBuilder {
         this.byteBody = addArrays(this.byteBody, content.getBytes());
     }
 
-    public void addToBody(File file) throws IOException {
-        byte[] fileB = Files.readAllBytes(file.toPath());
-        this.byteBody = addArrays(this.byteBody, fileB);
-        this.byteBody = addArrays(this.byteBody, CRLF.getBytes());
+    public void addToBody(File file)  {
+        try {
+            byte[] fileB = Files.readAllBytes(file.toPath());
+            this.byteBody = addArrays(this.byteBody, fileB);
+            this.byteBody = addArrays(this.byteBody, CRLF.getBytes());
+        } catch (IOException e) {
+            Controller.logger.log("Error while reading from the "+file.getName()+" file");
+        }
+
     }
     public void addToBody(byte[] arr)
     {

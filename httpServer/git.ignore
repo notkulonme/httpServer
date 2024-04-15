@@ -1,0 +1,6 @@
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+/example.rson
+.vscode/
+/venv
