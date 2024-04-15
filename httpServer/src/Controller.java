@@ -8,7 +8,6 @@ import java.net.Socket;
 public class Controller {
 
 
-    //these variables are just read only
 
     final public ServerSocket server;
     final private String confPath;
